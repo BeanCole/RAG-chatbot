@@ -1,3 +1,11 @@
 fastapi
 uvicorn
+openai
+qdrant-client
+langchain
+sqlalchemy
+pymysql
+pypdf
 pydantic-settings
+langchain-text-splitters
+cryptography
