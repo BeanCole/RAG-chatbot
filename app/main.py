@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 import logging
 from app.api.chat_router import router as chat_router
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,6 +26,7 @@ app.add_middleware(
 )
 
 app.include_router(chat_router, prefix="/api", tags=["Chatbot API"])
+app.mount("/frontend", StaticFiles(directory="/app/app/frontend"), name="frontend")
 
 @app.get("/")
 def test():
