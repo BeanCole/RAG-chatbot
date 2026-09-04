@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-commerce AI Assistant</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --bg-color: #f3f4f6;
+            --chat-bg: #ffffff;
+            --user-msg-bg: #dbeafe;
+            --bot-msg-bg: #f3f4f6;
+            --text-color: #1f2937;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 600px;
+            height: 90vh;
+            background-color: var(--chat-bg);
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 16px;
+            text-align: center;
+            font-size: 1.25rem;
+            font-weight: bold;
+        }
+
+        .chat-box {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .message {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 16px;
+            line-height: 1.5;
+            word-wrap: break-word;
+            /* Đã xóa white-space: pre-wrap ở đây để dẹp loạn vụ khoảng trắng thừa */
+        }
+
+        /* Tinh chỉnh lại CSS cho các thẻ HTML do Marked.js sinh ra */
+        .message p {
+            margin: 0 0 8px 0;
+        }
+
+        .message p:last-child {
+            margin: 0;
+        }
+
+        .message ul,
+        .message ol {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+
+        .message li {
+            margin-bottom: 4px;
+        }
+
+        .user-message {
+            align-self: flex-end;
+            background-color: var(--user-msg-bg);
+            color: var(--text-color);
+            border-bottom-right-radius: 4px;
+        }
+
+        .bot-message {
+            align-self: flex-start;
+            background-color: var(--bot-msg-bg);
+            color: var(--text-color);
+            border-bottom-left-radius: 4px;
+        }
+
+        .input-area {
+            padding: 16px;
+            background-color: white;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 24px;
+            outline: none;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary-color);
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 24px;
+            padding: 0 20px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #1d4ed8;
+        }
+
+        button:disabled {
+            background-color: #93c5fd;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="chat-container">
+        <div class="chat-header">
+            🛍️ Trợ lý Mua sắm AI
+        </div>
+        <div class="chat-box" id="chat-box"></div>
+        <div class="input-area">
+            <input type="text" id="user-input" placeholder="Ví dụ: Tìm điện thoại dưới 10 triệu..." autocomplete="off">
+            <button id="send-btn" onclick="sendMessage()">Gửi</button>
+        </div>
+    </div>
+
+    <script>
+        const chatBox = document.getElementById('chat-box');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+
+        // Hàm hỗ trợ in tin nhắn ra màn hình (dùng marked.parse để render HTML đẹp)
+        function appendMessage(text, className) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${className}`;
+            // Thay vì dùng textContent, ta dùng innerHTML để Marked.js chèn thẻ vào
+            msgDiv.innerHTML = marked.parse(text);
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            return msgDiv;
+        }
+
+        // Tự động in câu chào lúc mới mở trang (Viết trên 1 dòng duy nhất, không dùng enter)
+        appendMessage('Xin chào! Mình là trợ lý AI của cửa hàng. Mình có thể giúp bạn tìm kiếm sản phẩm gì hôm nay?', 'bot-message');
+
+        // Bắt sự kiện Enter để gửi
+        userInput.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        async function sendMessage() {
+            const query = userInput.value.trim();
+            if (!query) return;
+
+            // 1. Hiển thị tin nhắn của user
+            appendMessage(query, 'user-message');
+            userInput.value = '';
+            sendBtn.disabled = true;
+            userInput.disabled = true;
+
+            // 2. Tạo sẵn bong bóng chat rỗng cho AI
+            const botMessageDiv = document.createElement('div');
+            botMessageDiv.className = 'message bot-message';
+            chatBox.appendChild(botMessageDiv);
+
+            let fullBotText = ""; // Biến lưu trữ toàn bộ câu trả lời để render markdown liên tục
+
+            try {
+                // 3. Gọi API FastAPI
+                const response = await fetch('http://localhost:8081/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query })
+                });
+
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+                // 4. XỬ LÝ STREAMING KẾT HỢP MARKDOWN
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+                let done = false;
+
+                while (!done) {
+                    const { value, done: readerDone } = await reader.read();
+                    done = readerDone;
+
+                    if (value) {
+                        const chunk = decoder.decode(value, { stream: true });
+                        fullBotText += chunk;
+                        // Render lại toàn bộ chuỗi text bằng thư viện Marked mỗi khi có chữ mới
+                        botMessageDiv.innerHTML = marked.parse(fullBotText);
+                        chatBox.scrollTop = chatBox.scrollHeight;
+                    }
+                }
+            } catch (error) {
+                console.error('Lỗi khi gọi API:', error);
+                botMessageDiv.innerHTML = "❌ Lỗi kết nối đến máy chủ. Bạn kiểm tra lại FastAPI nhé!";
+            } finally {
+                sendBtn.disabled = false;
+                userInput.disabled = false;
+                userInput.focus();
+            }
+        }
+    </script>
+</body>
+
+</html>

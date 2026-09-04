@@ -15,7 +15,7 @@ def transform_jsonl_to_chunks(input_file, output_file, chunk_size=500, chunk_ove
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
 
     processed_trunks = set()  # To keep track of processed document IDs
-    with open(input_file, 'r', encoding='utf-8') as infile, open(output_file, 'w', encoding='utf-8') as outfile:
+    with open(input_file, 'r', encoding='utf-8') as infile:
         for line in infile:
             # Parse the JSON line
             doc = json.loads(line)
@@ -36,11 +36,11 @@ def transform_jsonl_to_chunks(input_file, output_file, chunk_size=500, chunk_ove
                 chunk_doc = {
                     'parent_doc_id': doc_id,
                     'chunk_id': f'{doc_id}_chunk_{i}',
-                    'content': chunk,
+                    'content': enriched_text,
                     'metadata': metadata,
                 }
                 processed_trunks.add(json.dumps(chunk_doc, ensure_ascii=False))  # Store the chunk as a JSON string to avoid duplicates
-    with open(output_file, 'a', encoding='utf-8') as outfile:
+    with open(output_file, 'w', encoding='utf-8') as outfile:
         for chunk in processed_trunks:
             outfile.write(chunk + '\n')
     print(f"Transformation complete. Output file: {output_file}")

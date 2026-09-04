@@ -20,9 +20,21 @@ def setup_qdrant():
         )
         print(f"Collection '{COLLECTION_NAME}' created.")
 
-        qdrant_client.create_payload_index(COLLECTION_NAME, "price", PayloadSchemaType.FLOAT)
-        qdrant_client.create_payload_index(COLLECTION_NAME, "category", PayloadSchemaType.KEYWORD)
-        print(f"Payload indexes for 'price' and 'category' created in collection '{COLLECTION_NAME}'.")
+    collection_info = qdrant_client.get_collection(COLLECTION_NAME)
+    payload_schema = collection_info.payload_schema
+
+    required_indexes = {
+        "metadata.price": PayloadSchemaType.FLOAT,
+        "metadata.category": PayloadSchemaType.KEYWORD,
+    }
+    for field_name, field_type in required_indexes.items():
+        if field_name not in payload_schema:
+            qdrant_client.create_payload_index(
+                collection_name=COLLECTION_NAME,
+                field_name=field_name,
+                field_schema=field_type,
+            )
+            print(f"Payload index '{field_name}' created.")
 
 def embed_and_load_chunks(input_file: str, batch_size: int = 100):
     with open(input_file, 'r', encoding='utf-8') as f:
