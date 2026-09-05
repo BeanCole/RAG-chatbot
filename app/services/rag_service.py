@@ -14,16 +14,16 @@ qdrant_client = QdrantClient(url=QDRANT_URL)
 
 # analyze query and return relevant products
 def analyze_query(query: str, category: str = None, max_price: float = None, top_k: int = 4):
-    # Dung LLM de phan tich cau hoi va tra ve cac tai lieu lien quan
-    analyzer_prompt = """Báº¡n lÃ  má»™t chuyÃªn gia phÃ¢n tÃ­ch dá»¯ liá»‡u sáº£n pháº©m. HÃ£y Ä‘á»c cÃ¢u há»i vÃ  tráº£ vá» ÄÃšNG 1 Äá»ŠNH Dáº NG JSON.
-    1. "category": "dien_tu" (Ä‘iá»‡n thoáº¡i, tai nghe,...), "thoi_trang" (quáº§n Ã¡o, balo,...), hoáº·c null náº¿u khÃ´ng rÃµ.
-    2. "max_price": CHÃš Ã - Pháº£i dá»‹ch cÃ¡c tá»« chá»‰ tiá»n tá»‡ sang sá»‘ nguyÃªn VNÄ:
-     - VÃ­ dá»¥: "10 triá»‡u", "10 cá»§" -> 1000000
-     - VÃ­ dá»¥: "500k", "500 cÃ nh" -> 500000
-     - VÃ­ dá»¥: "dÆ°á»›i 2 triá»‡u" -> 2000000
-     - Náº¿u cÃ¢u há»i khÃ´ng nháº¯c Ä‘áº¿n háº¡n giÃ¡ tá»‘i Ä‘a -> null
+    # Dùng LLM để phân tích câu hỏi và trả về các tài liệu liên quan
+    analyzer_prompt = """Bạn là một chuyên gia phân tích dữ liệu sản phẩm. Hãy đọc câu hỏi và trả về ĐÚNG 1 ĐỊNH DẠNG JSON.
+    1. "category": "dien_tu" (điện thoại, tai nghe,...), "thoi_trang" (quần áo, balo,...), hoặc null nếu không rõ.
+    2. "max_price": CHÚ Ý - Phải dịch các từ chỉ tiền tệ sang số nguyên VNĐ:
+     - Ví dụ: "10 triệu", "10 củ" -> 10000000
+     - Ví dụ: "500k", "500 cành" -> 500000
+     - Ví dụ: "dưới 2 triệu" -> 2000000
+     - Nếu câu hỏi không nhắc đến hạn giá tối đa -> null
 
-     Tráº£ vá» duy nháº¥t JSON, khÃ´ng thÃªm báº¥t ká»³ text nÃ o khÃ¡c.
+     Trả về duy nhất JSON, không thêm bất kỳ text nào khác.
     """
     try:
         response = ai_client.chat.completions.create(
@@ -39,26 +39,26 @@ def analyze_query(query: str, category: str = None, max_price: float = None, top
         extracted_data = json.loads(response.choices[0].message.content)
         return extracted_data
     except Exception as e:
-        logger.error(f"Lá»—i phÃ¢n tÃ­ch query: {e}")
+        logger.error(f"Lỗi phân tích query: {e}")
         return {"category": None, "max_price": None}
 
 
 def retrieve_context(query: str, category: str = None, max_price: float = None, top_k: int = 4) -> str:
     """
-    TÃ¬m kiáº¿m vector trong Qdrant káº¿t há»£p vá»›i bá»™ lá»c Metadata (Danh má»¥c, GiÃ¡).
+    Tìm kiếm vector trong Qdrant kết hợp với bộ lọc Metadata (Danh mục, Giá).
     """
     try:
-        # 1. NhÃºng cÃ¢u há»i cá»§a ngÆ°á»i dÃ¹ng thÃ nh Vector
+        # 1. Nhúng câu hỏi của người dùng thành Vector
         embed_res = ai_client.embeddings.create(
             input=query,
             model="text-embedding-3-small"
         )
         query_vector = embed_res.data[0].embedding
 
-        # 2. XÃ¢y dá»±ng bá»™ lá»c Metadata (Pre-filtering)
+        # 2. Xây dựng bộ lọc Metadata (Pre-filtering)
         must_conditions = []
 
-        # Lá»c theo danh má»¥c (Match chÃ­nh xÃ¡c)
+        # Lọc theo danh mục (Match chính xác)
         if category:
             must_conditions.append(
                 models.FieldCondition(
@@ -67,7 +67,7 @@ def retrieve_context(query: str, category: str = None, max_price: float = None, 
                 )
             )
 
-        # Lá»c theo khoáº£ng giÃ¡ (Nhá» hÆ¡n hoáº·c báº±ng max_price)
+        # Lọc theo khoảng giá (Nhỏ hơn hoặc bằng max_price)
         if max_price:
             must_conditions.append(
                 models.FieldCondition(
@@ -76,20 +76,20 @@ def retrieve_context(query: str, category: str = None, max_price: float = None, 
                 )
             )
 
-        # ÄÃ³ng gÃ³i filter
+        # Đóng gói filter
         search_filter = models.Filter(must=must_conditions) if must_conditions else None
 
-        # 3. TÃ¬m kiáº¿m Vector trÃªn Qdrant (Chá»‰ quÃ©t cÃ¡c document thá»a mÃ£n filter)
+        # 3. Tìm kiếm Vector trên Qdrant (Chỉ quét các document thỏa mãn filter)
         search_results = qdrant_client.query_points(
             collection_name=COLLECTION_NAME,
             query=query_vector,
             query_filter=search_filter,
             limit=top_k
         )
-        print("Káº¿t quáº£ tÃ¬m kiáº¿m tá»« Qdrant:", search_results)
+        print("Kết quả tìm kiếm từ Qdrant:", search_results)
 
         # reranking result
-        # 4. TrÃ­ch xuáº¥t ná»™i dung text tá»« cÃ¡c chunk tÃ¬m Ä‘Æ°á»£c
+        # 4. Trích xuất nội dung text từ các chunk tìm được
         if not search_results.points:
             return ""
 
@@ -108,53 +108,53 @@ def retrieve_context(query: str, category: str = None, max_price: float = None, 
 
         formatted_contexts = []
         for chunk in context_chunks:
-            # KIá»‚M TRA TYPE: Náº¿u lÃ  chÃ­nh sÃ¡ch thÃ¬ khÃ´ng hiá»‡n giÃ¡
+            # Kiểm tra type: Nếu là chính sách thì không hiện giá
             if chunk['type'] == 'policy':
-                combined_text = f"[CHÃNH SÃCH Cá»¬A HÃ€NG]\n{chunk['content']}"
+                combined_text = f"[CHÍNH SÁCH CỬA HÀNG]\n{chunk['content']}"
             else:
-                # Náº¿u lÃ  sáº£n pháº©m thÃ¬ má»›i format giÃ¡
+                # Nếu là sản phẩm thì mới format giá
                 formatted_price = f"{chunk['price']:,.0f}".replace(",", ".")
-                combined_text = f"[Sáº¢N PHáº¨M]\n{chunk['content']}\nGiÃ¡ bÃ¡n: {formatted_price} VNÄ"
+                combined_text = f"[SẢN PHẨM]\n{chunk['content']}\nGiá bán: {formatted_price} VNĐ"
 
             formatted_contexts.append(combined_text)
 
-        # Ná»‘i cÃ¡c khá»‘i láº¡i, dÃ¹ng phÃ¢n cÃ¡ch rÃµ rÃ ng Ä‘á»ƒ LLM khÃ´ng bá»‹ láº«n lá»™n cÃ¡c Ä‘oáº¡n
+        # Nối các khối lại, dùng phân cách rõ ràng để LLM không bị lẫn lộn các đoạn
         context_text = "\n\n" + "="*30 + "\n\n".join(formatted_contexts) + "\n\n" + "="*30
 
-        logger.info(f"Context Text gá»­i cho LLM:\n{context_text}")
+        logger.info(f"Context Text gửi cho LLM:\n{context_text}")
 
         return context_text
 
     except Exception as e:
-        logger.error(f"âŒ Lá»—i khi truy xuáº¥t Qdrant: {e}")
+        logger.error(f"Lỗi khi truy xuất Qdrant: {e}")
         return ""
 
 def generate_answer_stream(query: str, category: str = None, max_price: float = None):
     """
-        Generate function: Gá»i retrieval_context tá»« dá»¯ liá»‡u, sau Ä‘Ã³ stream káº¿t quáº£ tá»« LLM vá».
+        Generate function: Gọi retrieval_context từ dữ liệu, sau đó stream kết quả từ LLM về.
     """
 
-    # BÆ°á»›c 1: RÃºt trÃ­ch ngá»¯ cáº£nh tá»« Database
+    # Bước 1: Rút trích ngữ cảnh từ Database
     context = retrieve_context(query, category, max_price)
 
-    # Xá»­ lÃ½ trÆ°á»ng há»£p Database trá»‘ng hoáº·c khÃ´ng tÃ¬m tháº¥y sáº£n pháº©m phÃ¹ há»£p
+    # Xử lý trường hợp Database trống hoặc không tìm thấy sản phẩm phù hợp
     if not context:
-        yield "Xin lá»—i, hiá»‡n táº¡i chÃºng tÃ´i khÃ´ng tÃ¬m tháº¥y sáº£n pháº©m phÃ¹ há»£p vá»›i yÃªu cáº§u cá»§a báº¡n."
+        yield "Xin lỗi, hiện tại chúng tôi không tìm thấy sản phẩm phù hợp với yêu cầu của bạn."
         return
 
-    # BÆ°á»›c 2: XÃ¢y dá»±ng System Prompt cá»±c ká»³ cháº·t cháº½ (Prompt Engineering)
-    system_prompt = """ Báº¡n lÃ  trá»£ lÃ½ áº£o AI xuáº¥t sáº¯c cá»§a há»‡ thá»‘ng E-commerce.
-    QUY Táº®C Báº®T BUá»˜C:
-    1. ThÃ´ng tin trong [NGá»® Cáº¢NH Sáº¢N PHáº¨M] lÃ  cÃ¡c sáº£n pháº©m ÄÃƒ ÄÆ¯á»¢C Há»† THá»NG Lá»ŒC CHUáº¨N XÃC theo má»©c giÃ¡ vÃ  danh má»¥c khÃ¡c yÃªu cáº§u.
-    2. HÃ£y Tá»° TIN giá»›i thiá»‡u cÃ¡c sáº£n pháº©m nÃ y. TUYá»†T Äá»I KHÃ”NG Ä‘Æ°á»£c nÃ³i lÃ  "khÃ´ng cÃ³ sáº£n pháº©m nÃ o phÃ¹ há»£p" náº¿u trong ngá»¯ cáº£nh cÃ³ chá»©a sáº£n pháº©m.
-    3. KHÃ”NG tá»± Ã½ so sÃ¡nh toÃ¡n há»c (lá»›n hÆ¡n, nhá» hÆ¡n). Chá»‰ trÃ¬nh bÃ y láº¡i tÃªn, mÃ´ táº£ vÃ  giÃ¡ tiá»n cá»§a sáº£n pháº©m. Náº¿u cÃ³ nhiá»u sáº£n pháº©m trong ngá»¯ cáº£nh má»™t cÃ¡ch thÃ¢n thiá»‡n.
-    4. Náº¿u [NGá»® Cáº¢NH Sáº¢N PHáº¨M] hoÃ n toÃ n trá»‘ng, lÃºc Ä‘Ã³ má»›i lá»‹ch sá»± xin lá»—i khÃ¡ch hÃ ng.
+    # Bước 2: Xây dựng System Prompt chặt chẽ
+    system_prompt = """Bạn là trợ lý ảo AI xuất sắc của hệ thống E-commerce.
+    QUY TẮC BẮT BUỘC:
+    1. Thông tin trong [NGỮ CẢNH SẢN PHẨM] là các sản phẩm ĐÃ ĐƯỢC HỆ THỐNG LỌC CHUẨN XÁC theo mức giá và danh mục khách yêu cầu.
+    2. Hãy TỰ TIN giới thiệu các sản phẩm này. TUYỆT ĐỐI KHÔNG được nói là "không có sản phẩm nào phù hợp" nếu trong ngữ cảnh có chứa sản phẩm.
+    3. KHÔNG tự ý so sánh toán học (lớn hơn, nhỏ hơn). Chỉ trình bày lại tên, mô tả và giá tiền của sản phẩm. Nếu có nhiều sản phẩm trong ngữ cảnh, hãy trình bày một cách thân thiện.
+    4. Nếu [NGỮ CẢNH SẢN PHẨM] hoàn toàn trống, lúc đó mới lịch sự xin lỗi khách hàng.
 
-    [NGá»® Cáº¢NH Sáº¢N PHáº¨M]:
+    [NGỮ CẢNH SẢN PHẨM]:
     {context_data}
     """
 
-      # BÆ°á»›c 3: Gá»i API OpenAI vá»›i cháº¿ Ä‘á»™ Streaming
+    # Bước 3: Gọi API OpenAI với chế độ Streaming
     try:
         response = ai_client.chat.completions.create(
             model="gpt-4o-mini",
@@ -163,14 +163,14 @@ def generate_answer_stream(query: str, category: str = None, max_price: float = 
                 {"role": "user", "content": query}
             ],
             stream=True,
-            temperature=0.1 # Äá»ƒ siÃªu tháº¥p (0.1) Ä‘á»ƒ AI bÃ¡m sÃ¡t dá»¯ liá»‡u, khÃ´ng sÃ¡ng táº¡o lung tung
+            temperature=0.1 # Để siêu thấp để AI bám sát dữ liệu
         )
 
-        # Tráº£ vá» tá»«ng chá»¯ ngay khi OpenAI pháº£n há»“i
+        # Trả về từng chữ ngay khi OpenAI phản hồi
         for chunk in response:
             if chunk.choices[0].delta.content is not None:
                 yield chunk.choices[0].delta.content
 
     except Exception as e:
-        logger.error(f"âŒ Lá»—i khi gá»i OpenAI API: {e}")
-        yield "Há»‡ thá»‘ng AI Ä‘ang quÃ¡ táº£i, vui lÃ²ng thá»­ láº¡i sau giÃ¢y lÃ¡t."
+        logger.error(f"Lỗi khi gọi OpenAI API: {e}")
+        yield "Hệ thống AI đang quá tải, vui lòng thử lại sau giây lát."
