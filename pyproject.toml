@@ -1,0 +1,22 @@
+[project]
+name = "rag-chatbot-ecommerce"
+version = "1.0.0"
+description = "RAG chatbot for e-commerce product search (FastAPI + OpenAI + Qdrant + MySQL)"
+requires-python = ">=3.11"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+extend-exclude = ["app/frontend"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+ignore = ["E501", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B017"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-q"

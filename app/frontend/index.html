@@ -160,6 +160,11 @@
         const chatBox = document.getElementById('chat-box');
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
+        const API_URL = `${window.location.origin}/api/chat`;
+
+        // Lịch sử hội thoại gửi kèm mỗi request để bot nhớ ngữ cảnh
+        const history = [];
+        const MAX_HISTORY = 12;
 
         // Hàm hỗ trợ in tin nhắn ra màn hình (dùng marked.parse để render HTML đẹp)
         function appendMessage(text, className) {
@@ -197,35 +202,50 @@
             botMessageDiv.className = 'message bot-message';
             chatBox.appendChild(botMessageDiv);
 
-            let fullBotText = ""; // Biến lưu trữ toàn bộ câu trả lời để render markdown liên tục
+            let fullBotText = ""; // Toàn bộ câu trả lời để render markdown liên tục
 
             try {
                 // 3. Gọi API FastAPI
-                const response = await fetch('http://localhost:8081/api/chat', {
+                const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query: query })
+                    body: JSON.stringify({ query: query, history: history.slice(-MAX_HISTORY) })
                 });
 
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
-                // 4. XỬ LÝ STREAMING KẾT HỢP MARKDOWN
+                // 4. Đọc luồng SSE: mỗi frame là "data: <json-token>\n\n", kết thúc bằng "[DONE]"
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder("utf-8");
+                let buffer = "";
                 let done = false;
 
                 while (!done) {
                     const { value, done: readerDone } = await reader.read();
                     done = readerDone;
+                    buffer += decoder.decode(value || new Uint8Array(), { stream: true });
 
-                    if (value) {
-                        const chunk = decoder.decode(value, { stream: true });
-                        fullBotText += chunk;
-                        // Render lại toàn bộ chuỗi text bằng thư viện Marked mỗi khi có chữ mới
+                    const frames = buffer.split("\n\n");
+                    buffer = frames.pop();
+
+                    for (const frame of frames) {
+                        const trimmed = frame.trim();
+                        if (!trimmed.startsWith("data:")) continue;
+                        const payload = trimmed.slice(5).trim();
+                        if (payload === "[DONE]") { done = true; break; }
+                        try {
+                            fullBotText += JSON.parse(payload);
+                        } catch {
+                            fullBotText += payload;
+                        }
                         botMessageDiv.innerHTML = marked.parse(fullBotText);
                         chatBox.scrollTop = chatBox.scrollHeight;
                     }
                 }
+
+                // Lưu lượt này vào lịch sử
+                history.push({ role: "user", content: query });
+                history.push({ role: "assistant", content: fullBotText });
             } catch (error) {
                 console.error('Lỗi khi gọi API:', error);
                 botMessageDiv.innerHTML = "❌ Lỗi kết nối đến máy chủ. Bạn kiểm tra lại FastAPI nhé!";

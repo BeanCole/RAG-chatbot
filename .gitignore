@@ -1,5 +1,26 @@
+# Secrets
 .env
 .env.*
 !.env.example
+
+# Python
 __pycache__/
 *.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Test / lint caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Generated pipeline data (keep the folder + init.sql)
+data/*.jsonl
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
