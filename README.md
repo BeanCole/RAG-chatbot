@@ -1,7 +1,5 @@
 # RAG Chatbot E-commerce
 
-[![CI](https://github.com/BeanCole/RAG-chatbot/actions/workflows/ci.yml/badge.svg)](https://github.com/BeanCole/RAG-chatbot/actions/workflows/ci.yml)
-
 Chatbot tìm kiếm sản phẩm bằng Retrieval-Augmented Generation (RAG): FastAPI, OpenAI, Qdrant, MySQL.
 
 > **EN:** A Vietnamese e-commerce product-search chatbot. A FastAPI service turns a natural-language
@@ -105,8 +103,7 @@ python -m venv .venv
 .\.venv\Scripts\pytest
 ```
 
-Test không gọi mạng: OpenAI / Qdrant / MySQL đều được fake (xem `tests/conftest.py`). CI chạy
-`ruff` + `pytest` + `docker build` trên mỗi push/PR.
+Test không gọi mạng: OpenAI / Qdrant / MySQL đều được fake (xem `tests/conftest.py`).
 
 ## Design decisions
 
