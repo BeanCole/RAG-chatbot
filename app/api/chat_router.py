@@ -20,7 +20,7 @@ async def chat_with_bot(request: ChatRequest):
     tự phân tích câu hỏi bằng LLM để suy ra.
     """
     history = [m.model_dump() for m in request.history]
-    inferred = analyze_query(request.query, history=history)
+    inferred = analyze_query(request.query)
 
     category = request.category if request.category is not None else inferred.category
     max_price = (

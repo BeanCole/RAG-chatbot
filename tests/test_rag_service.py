@@ -60,6 +60,16 @@ def test_analyze_query_falls_back_on_bad_json(fake_openai):
     assert result == QueryFilters()
 
 
+def test_analyze_query_ignores_conversation_history(fake_openai):
+    # Regression: an earlier turn's category must never leak into a fresh,
+    # unrelated question (it previously caused "duoi 1 trieu" to inherit a
+    # stale category=dien_tu and match zero products).
+    analyze_query("tìm sản phẩm dưới 1 triệu")
+    sent_messages = fake_openai.chat_calls[-1]["messages"]
+    assert len(sent_messages) == 2  # system prompt + the current query only
+    assert sent_messages[-1]["content"] == "tìm sản phẩm dưới 1 triệu"
+
+
 # --- _build_filter --------------------------------------------------------
 def test_build_filter_combinations():
     assert _build_filter(None, None) is None

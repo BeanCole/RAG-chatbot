@@ -76,3 +76,14 @@ def test_missing_product_returns_404(client, fake_store):
 def test_create_rejects_negative_price(client, fake_store):
     resp = client.post("/api/products", json={"name": "X", "price": -5})
     assert resp.status_code == 422
+
+
+def test_create_rejects_category_outside_taxonomy(client, fake_store):
+    # A free-text category (e.g. "Smartphone") would never match the fixed
+    # dien_tu/thoi_trang values analyze_query() infers, so chat could never
+    # find the product again — reject it at creation time instead.
+    resp = client.post(
+        "/api/products",
+        json={"name": "iPhone 15", "category": "Smartphone", "price": 1},
+    )
+    assert resp.status_code == 422

@@ -3,17 +3,16 @@
 import json
 import logging
 from collections.abc import Iterator
-from typing import Literal, Optional
+from typing import Optional
 
 from pydantic import BaseModel, field_validator
 from qdrant_client import models
 
+from app.categories import Category
 from app.clients import get_openai, get_qdrant
 from app.config import settings
 
 logger = logging.getLogger(__name__)
-
-Category = Literal["dien_tu", "thoi_trang"]
 
 _ANALYZER_PROMPT = """Bạn là một chuyên gia phân tích dữ liệu sản phẩm. Hãy đọc câu hỏi và trả về ĐÚNG 1 ĐỊNH DẠNG JSON.
 1. "category": "dien_tu" (điện thoại, tai nghe,...), "thoi_trang" (quần áo, balo,...), hoặc null nếu không rõ.
@@ -77,14 +76,21 @@ def _history_messages(history: Optional[list[Message]]) -> list[Message]:
     ]
 
 
-def analyze_query(query: str, history: Optional[list[Message]] = None) -> QueryFilters:
-    """Use the chat model to extract structured filters from a natural-language query."""
+def analyze_query(query: str) -> QueryFilters:
+    """Use the chat model to extract structured filters from a natural-language query.
+
+    Deliberately ignores conversation history: an earlier turn's category/price
+    would otherwise "leak" into an unrelated later question (e.g. asking about
+    electronics, then "find anything under 1 million" incorrectly inheriting
+    category=dien_tu and matching nothing). History is still used for the
+    final answer in generate_answer_stream, where leaking context is what you
+    want (resolving "that one") rather than a bug.
+    """
     try:
         response = get_openai().chat.completions.create(
             model=settings.chat_model,
             messages=[
                 {"role": "system", "content": _ANALYZER_PROMPT},
-                *_history_messages(history),
                 {"role": "user", "content": query},
             ],
             response_format={"type": "json_object"},
